@@ -31,7 +31,7 @@ Write UML with `event [guard] / effect` transitions and success/failure ordering
 
 ### 2. Independent Antithesis research BEFORE implementation
 
-Use a separate agent with the prompt, UML/design, existing source if any, and the available `antithesis-research` skill. It must read that skill and applicable references. This is a required pass, not a synonym for writing ordinary unit tests. Preserve the scratchbook artifacts required by that skill inside the task directory. Link the property catalog into `TEST_PLAN.md`.
+Use a separate agent with the prompt, UML/design, existing source if any, and the available `antithesis-research` skill. It must read that skill and applicable references. This is a required pass, not a synonym for writing ordinary unit tests. If antithesis-research is unavailable, report that dependency rather than labeling a generic review as the required pass. Preserve the scratchbook artifacts required by that skill inside the task directory. Link the property catalog into `TEST_PLAN.md`.
 
 For a greenfield task, say explicitly that this is design-stage research: no implementation exists yet, proposed assertions are not installed, source-level defect claims are unavailable. Research the design, protocol, fault model, and intended interfaces. Revisit concrete code paths after implementation. Do not fabricate a code scan or claim an Antithesis execution occurred.
 
