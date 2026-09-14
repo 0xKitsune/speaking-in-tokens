@@ -2,6 +2,13 @@
 
 Running notes on communicating engineering intent to machines.
 
+## Skill and runnable example
+
+- [Reusable UML-first skill](SKILL.md)
+- [Raft from scratch in Rust](examples/raft/PROMPT.md) — first workflow exercise; see [design](examples/raft/DESIGN.md), [test plan](examples/raft/TEST_PLAN.md), and [phase record](examples/raft/HANDOFF.md).
+
+The current direction is UML with explicit guards/effects and readable English constraints/invariants, followed by independent Antithesis research and test planning, implementation, and a fresh test agent. Earlier Mermaid and Tempo notes below record how the idea developed; the runnable examples are standalone and domain-independent.
+
 ## What we care about
 
 Can we improve the fraction of autonomous engineering runs that succeed without human steering by giving agents a better representation of design goals, constraints, boundaries, and data flow?
@@ -204,7 +211,7 @@ Passing model checks alone does not establish implementation correctness. The ma
 
 ### Working direction
 
-Start with English for intent, Mermaid for the overview, a small executable state model for behavior, and human-reviewed traces for agreement.
+Updated direction: start with English for intent, UML for ownership, interactions and lifecycle, explicit constraints/invariants, and human-reviewed traces for agreement. Prefer precise UML guards and effects to introducing a separate formal specification language by default. A separate Antithesis research agent writes the test plan before an implementation agent starts; a fresh test agent follows the implementation handoff.
 
 Ideally, the diagram, transition table, and test scenarios are views of the same underlying model rather than separately maintained documents. This is a proposed design direction, not tooling we have built.
 
@@ -221,10 +228,10 @@ The human interface could let us explore “failure here,” “restart here,”
 
 ## How we would evaluate the idea
 
-Compare equivalent prose, prose plus diagrams, and prose plus diagrams plus executable constraints on fresh Tempo tasks. Keep the model and compute budget fixed. Preserve independent acceptance checks outside the agent's control.
+Compare equivalent prose, prose plus diagrams, and prose plus diagrams plus executable constraints on fresh standalone systems tasks. Keep the model and compute budget fixed. Preserve independent acceptance checks outside the agent's control.
 
 Measure successful runs without human intervention, constraint violations, human specification time, and total execution cost. Distinguish a single generation from an autonomous run that includes internal repair attempts.
 
 ## Curation
 
-Only the Intent Formalization paper is selected so far. Other papers discussed are not yet endorsed or added to the reading list. The diagram systematic review was explicitly removed.
+Only the Intent Formalization paper is selected so far. StructGen and the Dafny annotation paper were discussed but not selected. The ISO/prose-versus-JSON paper was explicitly skipped. The diagram systematic review was explicitly removed.
