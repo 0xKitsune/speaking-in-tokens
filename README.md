@@ -116,6 +116,100 @@ These checks are proposed, not implemented or run as part of this discussion.
 - What happens after a crash between acceptance, queue confirmation, and canonicalization?
 - If periodic queue draining is removed, how do retries and missed wakeups make progress?
 
+## English first, then an inspectable interpretation
+
+English is easy and fast to write, but can leave substantial room for interpretation. Keep that low-friction starting point. Have the agent expose its interpretation in a form humans can inspect, discuss, and correct before implementation.
+
+For example, “remove duplicates” admits at least two plausible behaviors:
+
+```text
+Input: [1, 2, 2, 3]
+
+Keep one occurrence of each value: [1, 2, 3]
+Remove every value that repeats:  [1, 3]
+```
+
+Showing these outcomes can resolve the ambiguity faster than asking a person to write a formal specification from scratch. The same principle applies to “the L1 subscriber should drive block production”: show the proposed behavior under concrete events, including failures.
+
+### Two design goals
+
+1. Make it easy for humans to share a thought, see the structure, and agree on intended behavior.
+2. Make the agent's interpretation observable and give tools a concrete basis for checking its implementation.
+
+We cannot directly prove that a model internally understands, or guarantee a successful one-shot. We can review its predicted behavior and check conformance to an agreed specification.
+
+### Representation options
+
+These are working assessments for our use case, not experimentally established rankings.
+
+| Representation | Human review | Machine checking |
+| --- | --- | --- |
+| Architecture and sequence diagrams | Good for actors, boundaries, and ordering | Need explicit semantics and additional checks |
+| State machines and statecharts | Good for lifecycle, permitted actions, and failure handling | Can execute explicit events, guards, and transitions |
+| Decision tables | Good for comparing combinations of conditions | Can drive exhaustive tests over the modeled finite cases |
+| Given / When / Then scenarios | Easy to read and discuss | Executable when connected to test code; cover the stated examples |
+| Formal models such as Alloy | More effort to author; visual counterexamples help review | Can search for violations within a configured scope |
+
+Mermaid → UML is not automatically a progression toward rigor. Mermaid already supports sequence and state diagrams. The important question is what precise semantics and checks sit behind the drawing.
+
+Relevant tools and documentation:
+
+- [XState / Stately](https://stately.ai/docs/quick-start): executable state machines and visual modeling.
+- [Gherkin](https://cucumber.io/docs/gherkin/reference/): scenarios connected to executable test steps.
+- [Alloy](https://alloytools.org/tutorials/online/maintext-default.html): model analysis and visualization.
+- [C4](https://c4model.com/diagrams): architecture views at different levels of detail.
+
+### Zones: inspect transitions before implementation
+
+Candidate transition table, continuing the illustrative L1-driven production example. “Ready,” retry scheduling, and the commit boundary still need agreement. This is not a complete state machine or a description of every current implementation path.
+
+| Current state | Event | Required condition | Action / next state |
+| --- | --- | --- | --- |
+| Idle | L1 work available | Next anchor ready; leadership valid | Start building H |
+| Building H | H+1 arrives | — | Queue H+1; continue H |
+| Building H | Build fails | — | Retain H; enter retry state |
+| Retry H | Retry triggered | Leadership still valid | Build H again |
+| Building H | Commit succeeds | Agreed success condition met | Confirm H; consider next anchor |
+
+A table like this exposes omissions early: what happens if leadership is revoked during a build? What if a commit outcome is unknown? These should become explicit decisions, not assumptions buried in generated code.
+
+### Ask the agent to predict behavior
+
+Before implementation, show a trace and its expected consequences:
+
+```text
+H becomes ready → build H → build fails → H+1 arrives
+
+Expected:
+  H remains pending.
+  H+1 cannot overtake H.
+  Retrying H requires valid leadership.
+```
+
+Then challenge the model with a forbidden trace:
+
+```text
+H becomes ready → build H → build fails → build H+1
+```
+
+The agreed model should reject the second trace. If it accepts it, the specification is missing a constraint. To make this check mechanical, “build H+1” needs a precise event definition and the ordering rule must be encoded in the executable model.
+
+Three distinct checks:
+
+1. **Human intent → model:** Review diagrams, tables, examples, and counterexamples. Does this describe the behavior we want?
+2. **Model → properties:** Exercise transitions and try to violate invariants. Does the model enforce the rules we agreed on?
+3. **Implementation → model:** Run event sequences against the implementation and compare observable behavior. Does the implementation conform?
+
+Passing model checks alone does not establish implementation correctness. The mapping from implementation events and state to the model must also be defined and checked. Finite tests still leave untested behavior.
+
+### Working direction
+
+Start with English for intent, Mermaid for the overview, a small executable state model for behavior, and human-reviewed traces for agreement.
+
+Ideally, the diagram, transition table, and test scenarios are views of the same underlying model rather than separately maintained documents. This is a proposed design direction, not tooling we have built.
+
+The human interface could let us explore “failure here,” “restart here,” or “leadership changes here,” agree on the expected behavior, and give the agent that same model to implement against. The human reviews behavior and boundaries; the agent handles implementation details within those constraints.
+
 ## Questions to keep exploring
 
 - What is the smallest specification a human can confidently review before letting an agent implement?
