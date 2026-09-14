@@ -2,6 +2,8 @@
 
 Running notes on communicating engineering intent to machines.
 
+**Status: in development.** Installation is not completion. Continue the current trial through context gathering, design discussion, plan approval, implementation, independent Antithesis research, fresh-agent tests, and review; incorporate what the trial exposes before calling the skill finished. Pause at the user greenlight gate and any actual blocker. The earlier Raft prototype does not count as a completed trial of this revised workflow.
+
 ## Skill and runnable example
 
 - [Reusable Mermaid-first skill](SKILL.md)
