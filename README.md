@@ -5,9 +5,9 @@ Running notes on communicating engineering intent to machines.
 ## Skill and runnable example
 
 - [Reusable UML-first skill](SKILL.md)
-- [Raft from scratch in Rust](examples/raft/README.md) — runnable HTTP service; see [prompt](examples/raft/PROMPT.md), [UML design](examples/raft/DESIGN.md), [independent test plan](examples/raft/TEST_PLAN.md), [test report](examples/raft/TEST_REPORT.md), and [phase record](examples/raft/HANDOFF.md).
+- [Raft plan](examples/raft/PLAN.md) — one document containing design, constraints, invariants, independently researched test cases, and implementation handoff. The runnable Rust source and tests are alongside it.
 
-The current direction is UML with explicit guards/effects and readable English constraints/invariants, followed by independent Antithesis research and test planning, implementation, and a fresh test agent. Earlier Mermaid and Tempo notes below record how the idea developed; the runnable examples are standalone and domain-independent.
+Every task produces one `PLAN.md` using the fixed form in the skill, including Rust architecture and validation requirements when applicable. The current direction is UML with explicit guards/effects and readable English constraints/invariants, followed by independent Antithesis research and test planning, implementation, and a fresh test agent. Earlier Mermaid and Tempo notes below record how the idea developed; the runnable examples are standalone and domain-independent.
 
 ## What we care about
 
