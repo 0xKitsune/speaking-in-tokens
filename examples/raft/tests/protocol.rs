@@ -136,8 +136,8 @@ fn election_unique_members_and_durable_vote() {
     }
     assert_eq!(x.core.role, Role::Candidate);
     let before = x.core.durable.clone();
-    assert!(x
-        .step(Event::VoteReply {
+    assert!(
+        x.step(Event::VoteReply {
             peer: 99,
             request: r.clone(),
             response: VoteResponse {
@@ -145,7 +145,8 @@ fn election_unique_members_and_durable_vote() {
                 granted: true
             }
         })
-        .is_err());
+        .is_err()
+    );
     assert_eq!(before, x.core.durable);
     x.step(Event::VoteReply {
         peer: 3,
@@ -422,10 +423,9 @@ impl Simulation {
         self.terms[id as usize - 1] = x.core.durable.term;
         if x.core.role == Role::Leader
             && (old_role != Role::Leader || old_term != x.core.durable.term)
+            && let Some(prior) = self.elected.insert(x.core.durable.term, id)
         {
-            if let Some(prior) = self.elected.insert(x.core.durable.term, id) {
-                assert_eq!(prior, id, "R1");
-            }
+            assert_eq!(prior, id, "R1");
         }
         for a in e.applied {
             if let Some(prior) = self.applied.insert(a.index, (a.term, a.command.clone())) {
@@ -545,10 +545,11 @@ fn seeded_fault_schedules_preserve_safety_then_progress() {
                         sim.drain();
                         sim.step(id, Event::Heartbeat);
                         sim.drain();
-                        assert!(sim
-                            .nodes
-                            .iter()
-                            .all(|x| x.core.kv.get("k").map(String::as_str) == Some("healed")));
+                        assert!(
+                            sim.nodes
+                                .iter()
+                                .all(|x| x.core.kv.get("k").map(String::as_str) == Some("healed"))
+                        );
                         return;
                     }
                 }
@@ -631,8 +632,8 @@ fn leader_transition_noop_must_persist_before_replication() {
     };
     let before = x.persistence.saved.clone();
     x.persistence.fail = true;
-    assert!(x
-        .step(Event::VoteReply {
+    assert!(
+        x.step(Event::VoteReply {
             peer: 2,
             request,
             response: VoteResponse {
@@ -640,7 +641,8 @@ fn leader_transition_noop_must_persist_before_replication() {
                 granted: true
             }
         })
-        .is_err());
+        .is_err()
+    );
     assert!(x.fenced);
     assert_eq!(x.core.role, Role::Candidate);
     assert_eq!(x.persistence.saved, before);

@@ -4,10 +4,10 @@ Running notes on communicating engineering intent to machines.
 
 ## Skill and runnable example
 
-- [Reusable UML-first skill](SKILL.md)
+- [Reusable Mermaid-first skill](SKILL.md)
 - [Raft plan](examples/raft/PLAN.md) — one document containing design, constraints, invariants, independently researched test cases, and implementation handoff. The runnable Rust source and tests are alongside it.
 
-Every task produces one `PLAN.md` using the fixed form in the skill, including Rust architecture and validation requirements when applicable. The current direction is UML with explicit guards/effects and readable English constraints/invariants, followed by independent Antithesis research and test planning, implementation, and a fresh test agent. Earlier Mermaid and Tempo notes below record how the idea developed; the runnable examples are standalone and domain-independent.
+Every task produces one `PLAN.md` using the fixed form in the skill, including Rust architecture and validation requirements when applicable. The current direction is browser-rendered Mermaid, selecting the diagram type that best expresses the system, with explicit guards/effects and readable English constraints/invariants, followed by user greenlight, implementation, independent Antithesis research against the source, a fresh test agent, and review. Context gathering and a grill-me-style design discussion precede the plan. Earlier Mermaid and Tempo notes below record how the idea developed; the runnable examples are standalone and domain-independent.
 
 ## What we care about
 
@@ -211,7 +211,7 @@ Passing model checks alone does not establish implementation correctness. The ma
 
 ### Working direction
 
-Updated direction: start with English for intent, UML for ownership, interactions and lifecycle, explicit constraints/invariants, and human-reviewed traces for agreement. Prefer precise UML guards and effects to introducing a separate formal specification language by default. A separate Antithesis research agent writes the test plan before an implementation agent starts; a fresh test agent follows the implementation handoff.
+Earlier direction (superseded by the current skill): UML plus English constraints, with Antithesis research before implementation. The current workflow uses inline Mermaid for browser readability, a design discussion and explicit user greenlight, implementation, Antithesis research against source, and independently authored tests.
 
 Ideally, the diagram, transition table, and test scenarios are views of the same underlying model rather than separately maintained documents. This is a proposed design direction, not tooling we have built.
 

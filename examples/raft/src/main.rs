@@ -1,19 +1,19 @@
 use axum::{
+    Json, Router,
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use speaking_raft::{storage::FileStorage, *};
 use std::{
     collections::BTreeMap,
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{mpsc, oneshot, Semaphore};
+use tokio::sync::{Semaphore, mpsc, oneshot};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -60,7 +60,7 @@ async fn request(api: Api, event: Event) -> Response {
                 "request capacity exhausted",
                 None,
                 false,
-            )))
+            )));
         }
     };
     let (tx, rx) = oneshot::channel();
@@ -215,14 +215,14 @@ async fn owner(
                 )));
             }
         }
-        if let Some(identity) = effects.proposal {
-            if let Some(answer) = answer.take() {
-                pending.push(Waiting {
-                    identity,
-                    answer,
-                    deadline: Instant::now() + Duration::from_millis(2800),
-                });
-            }
+        if let Some(identity) = effects.proposal
+            && let Some(answer) = answer.take()
+        {
+            pending.push(Waiting {
+                identity,
+                answer,
+                deadline: Instant::now() + Duration::from_millis(2800),
+            });
         }
         for applied in effects.applied {
             if let Some(pos) = pending.iter().position(|w| {

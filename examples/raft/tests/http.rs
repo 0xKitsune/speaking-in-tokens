@@ -1,18 +1,18 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::post,
-    Json, Router,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     fs,
     path::PathBuf,
     process::{Child, Command, Stdio},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -179,12 +179,12 @@ impl Cluster {
         let end = Instant::now() + Duration::from_secs(12);
         while Instant::now() < end {
             for i in 0..3 {
-                if Some(i) != excluded && self.children[i].is_some() {
-                    if let Some(s) = self.status(i).await {
-                        if s["role"] == "Leader" {
-                            return i;
-                        }
-                    }
+                if Some(i) != excluded
+                    && self.children[i].is_some()
+                    && let Some(s) = self.status(i).await
+                    && s["role"] == "Leader"
+                {
+                    return i;
                 }
             }
             tokio::time::sleep(Duration::from_millis(50)).await;

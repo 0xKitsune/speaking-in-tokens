@@ -10,58 +10,86 @@ Assumptions: identically configured, trusted, non-Byzantine peers; durable stora
 
 ## 2. Design
 
-Rust layout: one Cargo package (edition 2021); `src/lib.rs` owns the deterministic core and its event/effect API, `src/storage.rs` implements persistence, and `src/main.rs` owns HTTP and process orchestration. The core has no HTTP dependency in its control flow; a persistence trait permits real storage and fault injection. Integration tests live under `tests/`. Keep these boundaries cohesive and avoid speculative layers.
+Rust layout: one Cargo package (edition 2024); `src/lib.rs` owns the deterministic core and its event/effect API, `src/storage.rs` implements persistence, and `src/main.rs` owns HTTP and process orchestration. The core has no HTTP dependency in its control flow; a persistence trait permits real storage and fault injection. Integration tests live under `tests/`. Keep these boundaries cohesive and avoid speculative layers.
 
-Each process has one serialized node owner. The deterministic Raft core accepts messages, timeouts and proposals as explicit events. The owner persists changed durable state before releasing dependent messages or client results. Network requests execute outside the owner; never hold it across a network await. Storage failure fences further consensus/client activity until restart; local diagnostics may remain available.
+Each process has one serialized node owner. The deterministic Raft core accepts messages, timeouts and proposals as explicit events. The core persists changed durable state during its step before returning dependent messages or client results to the owner. Network requests execute outside the owner; never hold it across a network await. Storage failure fences further consensus/client activity until restart; local diagnostics may remain available.
 
 Durable state: cluster identity, node ID, membership, current term, voted-for, log, commit index. Volatile state: role, leader hint, candidate votes, next/match indexes, applied index, reconstructed KV map, pending client responses. Log indexes start at 1; index 0/term 0 denotes the empty prefix. Rebuild the map from the committed prefix only.
 
 Use an exclusive directory lock that also marks prior initialization. Sync the marker before first state creation. Save state through temp-write → file sync → atomic rename → directory sync. Existing marker with missing state, invalid state, or identity mismatch must fail startup; never silently reset an established node's vote/log. Interrupted initialization fails closed. Deleting all state and markers is outside the retained-storage model.
 
-```plantuml
-@startuml
-actor Client
-participant "HTTP / node owner" as Node
-participant "Raft core" as Core
-database "Durable state" as Disk
-participant Peers
-Client -> Node : put / get / delete
-Node -> Core : proposal [leader]
-Core --> Node : candidate state + effects
-Node -> Disk : persist before releasing effects [I7]
-Disk --> Node : durable
-Node -> Peers : AppendEntries(term, prefix, entries, commit)
-Peers --> Node : durable acknowledgment
-Node -> Core : correlated response
-Core --> Node : commit [current-term majority]; apply in order
-Node -> Disk : persist committed state
-Disk --> Node : durable
-Node --> Client : result captured for exact proposal [I6]
-note over Node,Peers
-Peer RPC handlers also persist before replying.
-No quorum means no new successful client operation.
-Timeout means unknown outcome, not rollback.
-end note
-@enduml
+The component view shows ownership and event/effect boundaries; arrows are labeled with what crosses each boundary.
+
+```mermaid
+flowchart TB
+    Client[HTTP clients] -->|bounded admission C6| Owner
+    subgraph Process[One node process]
+        Owner[Serialized node owner]
+        Core[Deterministic Raft core]
+        Disk[(Durable state)]
+        Transport[Outbound peer tasks]
+        Owner -->|events| Core
+        Core -->|persist before releasing effects I7| Disk
+        Core -->|durable effects and results| Owner
+        Owner -->|bounded outbound work C6| Transport
+        Transport -->|correlated replies| Owner
+    end
+    Transport <-->|vote and append RPCs C4| Peers[Configured peers]
+    Owner -->|exact committed result C2| Client
 ```
 
-```plantuml
-@startuml
-[*] --> Follower : load durable state / replay committed prefix
-Follower --> Candidate : election timeout / persist term+1 and self-vote
-Candidate --> Candidate : election timeout / start another term
-Candidate --> Leader : distinct majority [same term] / append no-op
-Candidate --> Follower : leader contact [term >= current]
-Leader --> Follower : higher-term RPC or reply / persist term, clear vote
-Follower : RequestVote [eligible + up-to-date] / persist vote before reply
-Leader : command / persist and replicate
-Leader : majority match [current-term entry] / persist commit and apply
-note bottom of Follower
-Any role steps down on a valid higher term.
-Stale traffic does not reset election timers.
-Storage failure in any role fences the node.
-end note
-@enduml
+The sequence view shows the successful quorum path and its failure boundaries. Persistence happens inside the core's step before its effects are released.
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Node as HTTP / node owner
+    participant Core as Raft core
+    participant Disk as Durable state
+    participant Peers as Configured peers
+    Client->>Node: put / get / delete
+    Node->>Core: proposal [leader]
+    Core->>Disk: persist candidate log [I7]
+    Disk-->>Core: durable
+    Core-->>Node: replication effects
+    Node->>Peers: AppendEntries(term, prefix, entries, commit)
+    Note over Core,Peers: Failed save fences node and suppresses dependent effects [I7]
+    Peers-->>Node: acknowledgment after peer persistence
+    Node->>Core: correlated response
+    alt Current-term entry has durable majority [I4]
+        Core->>Core: prepare commit and ordered apply, capture result [I5, I6]
+        Core->>Disk: persist committed state
+        Disk-->>Core: durable
+        Core->>Core: install prepared state
+        Core-->>Node: result for exact proposal
+        Node-->>Client: success [C2]
+    else Quorum unavailable until timeout
+        Node-->>Client: unknown outcome [C3]
+        Note over Client,Node: Timeout is not rollback.<br/>Operation may later commit.
+    end
+```
+
+The state view shows role changes. Transition labels are events, guards in brackets, and effects after `/`. Fencing stops consensus in every role until a successful restart.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Follower: load valid state / replay committed prefix
+        Follower --> Candidate: election timeout / persist term+1 and self-vote
+        Candidate --> Candidate: election timeout / start new term
+        Candidate --> Leader: votes [distinct majority, same term] / persist no-op
+        Candidate --> Follower: leader contact [term >= current] / accept leader
+        Leader --> Follower: higher-term RPC or reply / persist term, clear vote
+        note right of Follower
+            I1: eligible vote requires current-enough log
+            Persist granted vote before reply
+            I2: any higher term causes stepdown
+            C7: stale traffic cannot reset timer
+        end note
+        note right of Leader
+            Command: persist and replicate
+            I4: commit only with current-term majority
+            I5: apply committed entries in order
+        end note
 ```
 
 ## 3. Interfaces and constraints
@@ -117,9 +145,12 @@ Persistence-seam failures, actual process kills and physical power loss are diff
 
 ## 6. Implementation handoff
 
-Readiness: ready; no unresolved blocking design decisions.
+Status: historical implemented example; the new workflow applies to subsequent work.
+Approval: the original implementation was requested by the user; this consolidation does not claim a separate approval gate occurred.
 
-Apply the parent skill’s Rust standard: explicit ownership, recoverable I/O errors, narrow APIs, useful rustdoc, stable formatting and justified lint exceptions. Preserve edition 2021 and the committed lockfile; the example declares no MSRV or optional feature matrix. A Rust-standard review of the existing prototype remains separate from the previously completed behavioral checks; do not claim full conformance from passing Clippy alone.
+The original exercise used design-stage Antithesis research plus later source inspection. Future runs use the parent skill’s explicit greenlight and post-implementation research sequence. The existing seeded fault schedules are not a shrinking property-based suite, and hosted/SDK Antithesis integration remains outside this example’s completed scope.
+
+Apply the parent skill’s Rust standard: explicit ownership, recoverable I/O errors, narrow APIs, useful rustdoc, stable formatting and justified lint exceptions. Use edition 2024 and preserve the committed lockfile; the example declares no MSRV or optional feature matrix. A Rust-standard review of the existing prototype remains separate from the previously completed behavioral checks; do not claim full conformance from passing Clippy alone.
 
 1. Implement the deterministic core and durable-effects boundary, then file persistence and the HTTP owner/transport. Use `src/lib.rs`, `src/storage.rs`, `src/main.rs` and standard Cargo configuration.
 2. Implementation agent runs compilation/existing checks and stops. A fresh test agent implements T1–T13 under `tests/`. Expected outcomes remain fixed; return failures for repair rather than weakening checks.
@@ -135,3 +166,5 @@ cargo clippy --all-targets -- -D warnings
 Run from this directory, one process per terminal: `target/debug/speaking-raft config/node1.json`, then node2/node3. Configs use ports 9101–9103 and `data/node1`–`data/node3`. Find a leader through `/status`, then POST a C1 command to its `/kv` endpoint.
 
 Verification: existing implementation passed 16 tests (10 protocol, 3 storage, 3 HTTP), including 48 seeded 700-event fault schedules and real HTTP partition/restart checks; formatting and strict Clippy passed. Source review prompted one startup repair for missing established state. The tests' overload fixture and unknown-outcome oracle were corrected without changing requirements. No hosted Antithesis run or power-loss validation occurred. This consolidated plan includes the startup clarification learned during that exercise; earlier planning artifacts remain in Git history.
+
+Update validation: migrated to Rust edition 2024, applied stable rustfmt and Clippy let-chain fixes, and reran the 16 existing tests successfully with `cargo +stable test --locked`. `cargo +stable fmt --all -- --check` and `cargo +stable clippy --all-targets --locked -- -D warnings` passed. All three inline Mermaid diagrams rendered locally and were visually inspected. No new property-test or Antithesis campaign is claimed by this documentation/workflow update.

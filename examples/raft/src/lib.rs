@@ -429,10 +429,11 @@ impl Core {
                 // Reject contradictory same-term content, and all committed conflicts, before any mutation.
                 for (offset, x) in r.entries.iter().enumerate() {
                     let index = r.prev_index + offset + 1;
-                    if let Some(old) = self.durable.log.get(index - 1) {
-                        if old != x && (old.term == x.term || index <= self.durable.commit) {
-                            return Err("conflicting committed or same-term entry".into());
-                        }
+                    if let Some(old) = self.durable.log.get(index - 1)
+                        && old != x
+                        && (old.term == x.term || index <= self.durable.commit)
+                    {
+                        return Err("conflicting committed or same-term entry".into());
                     }
                 }
                 if r.term > self.durable.term {
@@ -539,11 +540,11 @@ impl<P: Persistence> Node<P> {
         }
         let mut next = self.core.clone();
         let effects = next.transition(event)?;
-        if next.durable != self.core.durable {
-            if let Err(err) = self.persistence.save(&next.durable) {
-                self.fenced = true;
-                return Err(format!("storage failure; node fenced: {err}"));
-            }
+        if next.durable != self.core.durable
+            && let Err(err) = self.persistence.save(&next.durable)
+        {
+            self.fenced = true;
+            return Err(format!("storage failure; node fenced: {err}"));
         }
         self.core = next;
         Ok(effects)
