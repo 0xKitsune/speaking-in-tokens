@@ -1,239 +1,54 @@
 # Speaking in Tokens
 
-Running notes on communicating engineering intent to machines.
+Speaking in Tokens is a Codex skill for turning substantial engineering work into a reviewable design contract before implementation.
 
-**Status: in development.** Installation is not completion. Continue the current trial through context gathering, design discussion, plan approval, implementation, independent Antithesis research, fresh-agent tests, and review; incorporate what the trial exposes before calling the skill finished. Pause at the user greenlight gate and any actual blocker. The earlier Raft prototype does not count as a completed trial of this revised workflow.
+The skill produces one planning artifact, `PLAN.md`, using the contract defined in [SKILL.md](SKILL.md). Its primary review surface is a concise Mermaid system snapshot connected to explicit constraints and invariants. The goal is to let engineers quickly see what system is being proposed, which boundaries and behaviors are binding, and what needs correction.
 
-## Skill and runnable example
+The interaction starts with a prompt, not an interview. The agent inspects available context, drafts the complete artifact, and presents it. The engineer then corrects the artifact until it is ready for approval.
 
-- [Reusable Mermaid-first skill](SKILL.md)
-- [Raft plan](examples/raft/PLAN.md) — one document containing design, constraints, invariants, independently researched test cases, and implementation handoff. The runnable Rust source and tests are alongside it.
+## What the skill enforces
 
-Every task produces one `PLAN.md` using the fixed form in the skill, including Rust architecture and validation requirements when applicable. The current direction is browser-rendered Mermaid, selecting the diagram type that best expresses the system, with explicit guards/effects and readable English constraints/invariants, followed by user greenlight, implementation, independent Antithesis research against the source, a fresh test agent, and review. Context gathering and a grill-me-style design discussion precede the plan. Earlier Mermaid and Tempo notes below record how the idea developed; the runnable examples are standalone and domain-independent.
+- One `PLAN.md`, with a stable six-section structure.
+- One primary Mermaid system snapshot showing actors, boundaries, ownership, authoritative state, permitted interactions, and contract-changing failure paths.
+- Stable constraint IDs (`C1`, `C2`) and invariant IDs (`I1`, `I2`) shared by the diagram, English contract, and tests.
+- Explicit `confirmed`, `proposed`, and `unresolved` statuses so inferred decisions do not look agreed.
+- No implementation until the user approves a plan with no unresolved constraints.
+- Implementation, independent Antithesis research, independently authored tests, repair, and a fresh independent review against the approved contract.
 
-## What we care about
+## Workflow
 
-Can we improve the fraction of autonomous engineering runs that succeed without human steering by giving agents a better representation of design goals, constraints, boundaries, and data flow?
+1. Inspect the prompt, source, tests, interfaces, and operational environment without conducting a requirements interview.
+2. Draft the complete constraint-first `PLAN.md`, marking inferred choices and unresolved decisions.
+3. Present the artifact and apply corrections directly to it.
+4. Wait for explicit user greenlight.
+5. Implement the approved plan.
+6. Run independent Antithesis research against the implementation.
+7. Have a fresh agent write and run the acceptance tests.
+8. Repair failures, then have a fresh reviewer inspect the complete diff, tests, configuration, risks, and coverage against the contract.
 
-We want something easy for humans to write, inspect, and agree on, but precise enough for a machine to implement and check. Mermaid diagrams are one possible bridge. The objective is not to replace English for its own sake: it is to reduce unstated assumptions and make important requirements enforceable.
+The complete instructions and required plan form are in [SKILL.md](SKILL.md).
 
-Working distinction:
+## Rationale
 
-- Prose explains goals, motivation, and tradeoffs.
-- Diagrams expose actors, ownership, ordering, and data flow.
-- Contracts and invariants specify what must or must not happen.
-- Executable checks test whether an implementation respects those requirements.
+**Problem.** Natural-language requirements are fast to write but often leave behavior, boundaries, and failure semantics open to interpretation. [Intent Formalization](https://arxiv.org/abs/2603.17150) calls this the intent gap: an agent can faithfully implement its own coherent interpretation and still build the wrong system. Tests or proofs against that same interpretation can establish internal consistency without establishing that the specification captured what the engineer meant.
 
-A change of notation alone may not help. We need to distinguish better formatting from better specification, and better specification from better verification.
+**Solution.** Before writing code, the agent externalizes its interpretation as one compact artifact: a readable system diagram, precise constraints and invariants, and observable acceptance conditions. Proposed and unresolved choices are visible so the engineer can correct the artifact and approve a shared contract. Implementation, independent testing, and independent review then use that contract as their source of truth rather than inferring intent again from the original prompt or from the produced code.
 
-## Papers we care about
+**Human interface.** The artifact is designed to make the model's understanding and suggested approach as easy as possible to read, intuit, and reason about. Engineers should be able to see the proposed boundary, ownership, state, control and data flow, failure behavior, and open choices in one pass—and correct a box, arrow, or rule without reconstructing the design from a long conversation or generated code.
 
-### 1. Intent Formalization: A Grand Challenge for Reliable Coding in the Age of AI Agents
+The goal is not more notation; it is faster correction of hidden assumptions and a stable basis for verification. Mermaid helps only when its boxes and arrows connect to exact, reviewable rules.
 
-**Shuvendu K. Lahiri — March 2026 — position paper / arXiv**
+## Research
 
-- [Paper](https://arxiv.org/abs/2603.17150)
-- [Full text](https://arxiv.org/html/2603.17150v1)
-- [Microsoft Research publication record](https://www.microsoft.com/en-us/research/publication/intent-formalization-a-grand-challenge-for-reliable-coding-in-the-age-of-ai-agents/)
+These papers motivate the skill; they are context, not additional workflow requirements.
 
-**Why we care:** An agent can faithfully implement its interpretation of a request and still build the wrong thing. The paper calls the gap between informal intent and precise program behavior the intent gap. It proposes translating intent into checkable specifications, ranging from concrete examples and assertions to formal contracts and domain-specific languages.
+- [*Intent Formalization: A Grand Challenge for Reliable Coding in the Age of AI Agents*](https://arxiv.org/abs/2603.17150) frames the gap between human intent and the specification an agent actually implements. See also the [Microsoft Research publication record](https://www.microsoft.com/en-us/research/publication/intent-formalization-a-grand-challenge-for-reliable-coding-in-the-age-of-ai-agents/).
+- [*Structure-guided function-level code generation with LLMs via UML activity diagrams*](https://doi.org/10.1016/j.neucom.2025.132502) introduces StructGen and evaluates UML activity diagrams as guidance between requirements and code generation.
 
-The particularly interesting flow:
+Intent Formalization is a position paper: it establishes the intent gap as a serious research problem but does not test this interface. StructGen reports improved function-level code generation with UML guidance, but it does not isolate diagrams from the additional planning and repair work, test human review, or establish repository-scale results.
 
-```text
-Human describes the goal
-→ agent exposes its interpretation as a specification
-→ human resolves ambiguities and agrees on the boundaries
-→ agent implements against the specification
-→ tools check compliance and return actionable failures
-```
+## Evidence boundary
 
-**The hard part:** A specification can be wrong or incomplete. Proving code satisfies it does not prove that it captures the human's intent. The human review surface is therefore a central design problem: how can we make assumptions and omissions easy to spot before implementation?
+No selected paper establishes that engineers can reliably catch incorrect intent by reviewing the artifact this skill produces. No selected paper establishes that Mermaid is superior to equally precise prose, that the constraint tables and diagram remain consistent, or that this workflow improves autonomous repository-scale implementation.
 
-**What this paper supports:** This is an established research problem with concrete approaches and prior work behind it.
-
-**What it does not establish:** That Mermaid beats equivalent prose, that formal specifications are easy for humans to author, or that this workflow guarantees autonomous production-quality engineering.
-
-**Validation status:** Paper and Microsoft Research attribution verified. This is a position paper synthesizing earlier work, not a controlled experiment establishing the best representation. We have not independently reproduced its cited experiments.
-
-## Worked example: L1 subscriber drives Zone block production
-
-Starting request:
-
-> The L1 subscriber should drive block production.
-
-This is an illustrative specification exercise, not an approved implementation change.
-
-### Relevant current behavior
-
-Inspected in the Zones checkout on 2026-09-14:
-
-- `crates/l1/src/subscriber.rs`: subscriber queues finalized L1 blocks.
-- `crates/node/src/engine.rs`: queue notifications wake production; a one-second forkchoice heartbeat also drains available work.
-- `crates/l1/src/queue.rs`: pending blocks are ordered and exact tip redelivery is deduplicated.
-- The engine confirms a pending block after a valid `newPayload` response, then attempts to canonicalize the new head with a forkchoice update.
-
-The broad event-driven behavior already exists. A useful agent should identify that before treating the request as a new architecture.
-
-### Candidate interpretation to review
-
-The subscriber determines when finalized L1 work becomes available. The engine owns Zone block production. Produce one Zone block per finalized L1 block, in order, including blocks without deposits. Transaction arrival alone does not trigger production.
-
-This is a candidate interpretation, not a settled requirement.
-
-```mermaid
-sequenceDiagram
-    participant L as L1
-    participant S as Subscriber
-    participant Q as Pending queue
-    participant E as Zone engine
-    L->>S: Finalized block H
-    S->>S: Validate and prepare required inputs
-    S->>Q: Make H available
-    Q-->>E: Wake producer
-    E->>E: Check leadership for H
-    E->>E: Build and submit Zone block anchored to H
-    alt Payload accepted
-        E->>Q: Confirm H
-    else Build or submission fails
-        E->>E: Retry H before advancing
-    end
-```
-
-This diagram expresses a proposed contract, not every detail of the existing implementation.
-
-### Candidate checkable specifications
-
-| Property | Observable check |
-| --- | --- |
-| No production without pending L1 work | Advance time and submit pool transactions with an empty L1 queue; no new Zone block. |
-| Empty L1 blocks drive production | Deliver a finalized block with no deposits; a Zone block is produced. |
-| Preserve order | Deliver H, H+1, H+2 during a slow build; committed anchors appear in order. |
-| Retain failed work | Fail submission for H; H remains pending and H+1 is not processed first. |
-| Deduplicate exact tip redelivery | Redeliver the same tip height/hash; no additional queue entry or committed block. |
-| Respect leadership | Revoke authority at H; the old leader cannot start producing H. |
-| Do not rely on one wakeup per block | Queue several blocks while busy; all eventually process even if notifications coalesce, assuming the node stays authorized and dependencies recover. |
-
-These checks are proposed, not implemented or run as part of this discussion.
-
-### Decisions the agent should expose
-
-- Does “drive” mean one Zone block per L1 block, or that L1 advancement enables a different production cadence?
-- Should the subscriber call production directly, or publish work through a queue?
-- What must be ready before H becomes consumable: receipts, leadership transitions, keys, state, evidence?
-- What counts as success: payload acceptance, canonical head update, or durable recovery after a crash?
-- What happens after a crash between acceptance, queue confirmation, and canonicalization?
-- If periodic queue draining is removed, how do retries and missed wakeups make progress?
-
-## English first, then an inspectable interpretation
-
-English is easy and fast to write, but can leave substantial room for interpretation. Keep that low-friction starting point. Have the agent expose its interpretation in a form humans can inspect, discuss, and correct before implementation.
-
-For example, “remove duplicates” admits at least two plausible behaviors:
-
-```text
-Input: [1, 2, 2, 3]
-
-Keep one occurrence of each value: [1, 2, 3]
-Remove every value that repeats:  [1, 3]
-```
-
-Showing these outcomes can resolve the ambiguity faster than asking a person to write a formal specification from scratch. The same principle applies to “the L1 subscriber should drive block production”: show the proposed behavior under concrete events, including failures.
-
-### Two design goals
-
-1. Make it easy for humans to share a thought, see the structure, and agree on intended behavior.
-2. Make the agent's interpretation observable and give tools a concrete basis for checking its implementation.
-
-We cannot directly prove that a model internally understands, or guarantee a successful one-shot. We can review its predicted behavior and check conformance to an agreed specification.
-
-### Representation options
-
-These are working assessments for our use case, not experimentally established rankings.
-
-| Representation | Human review | Machine checking |
-| --- | --- | --- |
-| Architecture and sequence diagrams | Good for actors, boundaries, and ordering | Need explicit semantics and additional checks |
-| State machines and statecharts | Good for lifecycle, permitted actions, and failure handling | Can execute explicit events, guards, and transitions |
-| Decision tables | Good for comparing combinations of conditions | Can drive exhaustive tests over the modeled finite cases |
-| Given / When / Then scenarios | Easy to read and discuss | Executable when connected to test code; cover the stated examples |
-| Formal models such as Alloy | More effort to author; visual counterexamples help review | Can search for violations within a configured scope |
-
-Mermaid → UML is not automatically a progression toward rigor. Mermaid already supports sequence and state diagrams. The important question is what precise semantics and checks sit behind the drawing.
-
-Relevant tools and documentation:
-
-- [XState / Stately](https://stately.ai/docs/quick-start): executable state machines and visual modeling.
-- [Gherkin](https://cucumber.io/docs/gherkin/reference/): scenarios connected to executable test steps.
-- [Alloy](https://alloytools.org/tutorials/online/maintext-default.html): model analysis and visualization.
-- [C4](https://c4model.com/diagrams): architecture views at different levels of detail.
-
-### Zones: inspect transitions before implementation
-
-Candidate transition table, continuing the illustrative L1-driven production example. “Ready,” retry scheduling, and the commit boundary still need agreement. This is not a complete state machine or a description of every current implementation path.
-
-| Current state | Event | Required condition | Action / next state |
-| --- | --- | --- | --- |
-| Idle | L1 work available | Next anchor ready; leadership valid | Start building H |
-| Building H | H+1 arrives | — | Queue H+1; continue H |
-| Building H | Build fails | — | Retain H; enter retry state |
-| Retry H | Retry triggered | Leadership still valid | Build H again |
-| Building H | Commit succeeds | Agreed success condition met | Confirm H; consider next anchor |
-
-A table like this exposes omissions early: what happens if leadership is revoked during a build? What if a commit outcome is unknown? These should become explicit decisions, not assumptions buried in generated code.
-
-### Ask the agent to predict behavior
-
-Before implementation, show a trace and its expected consequences:
-
-```text
-H becomes ready → build H → build fails → H+1 arrives
-
-Expected:
-  H remains pending.
-  H+1 cannot overtake H.
-  Retrying H requires valid leadership.
-```
-
-Then challenge the model with a forbidden trace:
-
-```text
-H becomes ready → build H → build fails → build H+1
-```
-
-The agreed model should reject the second trace. If it accepts it, the specification is missing a constraint. To make this check mechanical, “build H+1” needs a precise event definition and the ordering rule must be encoded in the executable model.
-
-Three distinct checks:
-
-1. **Human intent → model:** Review diagrams, tables, examples, and counterexamples. Does this describe the behavior we want?
-2. **Model → properties:** Exercise transitions and try to violate invariants. Does the model enforce the rules we agreed on?
-3. **Implementation → model:** Run event sequences against the implementation and compare observable behavior. Does the implementation conform?
-
-Passing model checks alone does not establish implementation correctness. The mapping from implementation events and state to the model must also be defined and checked. Finite tests still leave untested behavior.
-
-### Working direction
-
-Earlier direction (superseded by the current skill): UML plus English constraints, with Antithesis research before implementation. The current workflow uses inline Mermaid for browser readability, a design discussion and explicit user greenlight, implementation, Antithesis research against source, and independently authored tests.
-
-Ideally, the diagram, transition table, and test scenarios are views of the same underlying model rather than separately maintained documents. This is a proposed design direction, not tooling we have built.
-
-The human interface could let us explore “failure here,” “restart here,” or “leadership changes here,” agree on the expected behavior, and give the agent that same model to implement against. The human reviews behavior and boundaries; the agent handles implementation details within those constraints.
-
-## Questions to keep exploring
-
-- What is the smallest specification a human can confidently review before letting an agent implement?
-- Can an agent expose ambiguity through examples and counterexamples rather than a long requirements interview?
-- Can diagrams and executable checks share a single source of truth so they do not drift?
-- How do we check architectural constraints such as ownership and permitted dependencies, beyond input/output behavior?
-- How do we prevent an agent from weakening the specification or tests to make its implementation pass?
-- Where does specification effort stop paying for itself?
-
-## How we would evaluate the idea
-
-Compare equivalent prose, prose plus diagrams, and prose plus diagrams plus executable constraints on fresh standalone systems tasks. Keep the model and compute budget fixed. Preserve independent acceptance checks outside the agent's control.
-
-Measure successful runs without human intervention, constraint violations, human specification time, and total execution cost. Distinguish a single generation from an autonomous run that includes internal repair attempts.
-
-## Curation
-
-Only the Intent Formalization paper is selected so far. StructGen and the Dafny annotation paper were discussed but not selected. The ISO/prose-versus-JSON paper was explicitly skipped. The diagram systematic review was explicitly removed.
+Those are hypotheses this skill makes testable. The artifact must make proposed choices visible, the engineer must correct it before approval, and implementation and tests must be checked against the approved constraints. The quality of that review must be evaluated through actual use; a coherent-looking diagram is not evidence that the design is correct.
