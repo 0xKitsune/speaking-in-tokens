@@ -1,138 +1,164 @@
 ---
 name: speaking-in-tokens
-description: Turn an engineering prompt into a constraint-first PLAN.md with a readable Mermaid system snapshot, then guide approval, implementation, independent Antithesis research, fresh-agent tests, and review. Use when engineers need to verify and correct a proposed system quickly before implementation.
+description: Analyze an engineering change and produce one code-grounded, constraint-first spt_<task>.md artifact for human review. Use when a proposed system needs readable diagrams, precise bounds and invariants, an implementation map, and concrete test coverage before code is written.
 ---
 
 # Speaking in Tokens
 
-Produce exactly **one planning artifact: `PLAN.md`**. It is the complete contract for the work. Use the form below, with the same numbered headings in the same order every time. Scale the contents to the task; keep the form stable.
+Produce exactly one planning artifact. Name it `spt_<descriptive_task_slug>.md`: use the `spt_` prefix and a short lowercase snake-case description of the engineering task, such as `spt_automated_failover.md`. Never use a generic name such as `PLAN.md`.
 
-Optimize the plan for correction speed. An engineer should be able to scan the primary diagram and constraint tables and answer: Is this the right system boundary? Who owns each decision and state transition? Which interactions are allowed? Which limits and failure behaviors are binding? Which choices are still proposed or unresolved?
+The artifact is the proposed system, written so an experienced engineer can understand its behavior, boundaries, failure semantics, and implementation consequences without reading the source first.
 
-Constraints and invariants are the contract. Mermaid is their visual index, not a substitute for precise English. Give every consequential rule a stable constraint ID (`C1`, `C2`) or invariant ID (`I1`, `I2`), attach the relevant IDs to the diagram, and cover them from section 5. Do not present an inference as an agreed requirement.
+This is a design-planning skill, not an experiment log or an approval workflow. Do not create alternate versions, companion reports, prompt transcripts, review-focus sections, status dashboards, approval gates, or implementation handoffs. Do not write production code or tests unless the user separately asks for implementation.
 
-Do not generate prompt transcripts, task-specific skills, separate design/test plans, scratchbooks, property files, reports, handoff files, diagram sidecars, or rendering scripts. Keep diagrams inline in fenced `mermaid` blocks so the plan renders in Markdown in the target browser. Human readability is the primary design criterion. Research findings belong in the relevant sections of the plan, not in an appendix of process history. Source and test files are created only when implementation is authorized; they are not planning artifacts.
+## Build the plan from the code
 
-## Workflow: draft, agree, build, test, review
+1. Read the request, complete relevant call paths, surrounding code, tests, configuration, deployment assumptions, and linked repositories in scope. Follow behavior across abstraction boundaries instead of inferring it from names.
+2. Establish the actual state owners, authority source, concurrency model, shutdown behavior, durable stores, trust boundaries, retry and timeout behavior, and existing recovery paths. Record only facts that constrain the proposed design.
+3. Resolve questions from the repository when possible. Make a defensible design choice when the evidence supports one; ask the user only when a missing decision would materially change the system and cannot be inferred safely.
+4. Use `antithesis-research` automatically, without asking permission, to identify failure-prone boundaries, safety and liveness properties, observability needs, and useful fault schedules. This is research for the plan: recommend what tests should be written, but do not write the tests. Fold the results into `Test coverage`; do not create an Antithesis report or campaign section.
+5. Write or replace the task's existing `spt_*.md` artifact. If an earlier artifact has a generic or obsolete name, rename and revise it in place rather than leaving two versions.
+6. Render and inspect every Mermaid diagram. Correct syntax, direction, clipping, excessive width or height, and labels that require surrounding prose to decode. Temporary render files stay outside the repository.
 
-1. **Gather context without interviewing.** Read the prompt, relevant source, existing tests, interfaces and operational constraints. Investigate questions that the repository can answer. Identify actors, system and trust boundaries, data, relationships, state owners, allowed dependencies, failure modes and intended outcomes. Do not ask planning questions before producing the first artifact.
-2. **Draft the artifact.** Create the complete six-section `PLAN.md` immediately. Make reasonable choices when the prompt and repository support them. Mark sourced requirements as `confirmed`, agent-selected defaults as `proposed`, and decisions that cannot safely be inferred as `unresolved`. Put alternatives and their consequences in the review focus instead of starting a question-by-question exchange. Lead section 2 with one readable Mermaid system snapshot. Section 5 includes concrete proposed test cases and coverage; mark post-implementation Antithesis research as pending.
-3. **Present and revise the artifact.** Present/link `PLAN.md` and summarize only the proposed or unresolved choices that need attention. Treat the document as the conversation surface: apply the user's corrections directly, keep its diagram, constraints, invariants and tests consistent, and present the revised artifact. Do not switch to an interview unless the user explicitly asks for one.
-4. **Wait for the user's greenlight.** Stop before implementation with section 6 set to `awaiting user greenlight`. There must be no `unresolved` constraint or invariant at this gate. A general request to build something is not approval of an unseen plan in this workflow. An explicit greenlight for the current plan confirms its `proposed` rows; update their status and do not ask again. Material changes to the agreed contract return to artifact revision and approval before dependent work.
-5. **Implement the approved plan.** An implementation agent writes production code and the agreed test seams, runs formatting, compilation, lints and existing tests, records the brief handoff in section 6, then stops. It must not author or weaken the independent acceptance suite to fit its code.
-6. **Run independent Antithesis research against the implementation.** A separate agent reads and runs `antithesis-research`, using the approved plan and actual source. It maps invariants and failure-prone paths, proposes concrete unit, property-based, simulation, process and Antithesis workloads/assertions as appropriate, and updates section 5 with fault schedules, observables, oracles and test hooks. Flag contract gaps in section 6. The single-file requirement overrides the research skill's scratchbook layout: return findings to the orchestrator or edit PLAN.md only. If the skill is missing, report the missing pass; do not relabel ordinary testing as Antithesis research.
-7. **Have a fresh agent write and run the tests.** Give another agent the approved plan, completed research and source. It implements the test cases and required Antithesis integration within the agreed scope. Expected behavior comes from the contract; inspect source only to connect fixtures and instrumentation. Return defects for repair; change a test expectation only when demonstrably wrong against the contract. Re-run affected checks after repairs.
-8. **Pass an independent review gate.** A fresh reviewer that did not implement the change or author its acceptance tests inspects the complete diff, surrounding code, tests and relevant configuration. It checks every approved constraint and invariant ID, preserved behavior, correctness, compatibility and consensus risk, security and authorization boundaries, rollout and operational failure modes, unnecessary complexity, and missing behavioral coverage. Passing tests are evidence, not a substitute for this review. Blocking findings return to implementation, affected checks are rerun, and the reviewer verifies the repair. Section 6 records findings, repairs, checks actually run, remaining gaps and the final readiness decision. Separate local property tests, fault simulation and hosted Antithesis results. Missing required coverage, an unreviewed repair or an unresolved blocking finding means blocked/incomplete, not ready. All reporting stays in PLAN.md; no separate report or PR is required unless requested.
+## Artifact order
 
-## Test contract for Rust
+Use this reading order, adapting subsection names to the system:
 
-Section 5 must specify executable cases, not just a list of tools. For each applicable layer, identify covered constraint and invariant IDs, setup, actions or generated inputs, observable assertions and replay/reproduction method. Explain any inapplicable layer briefly.
+1. Title.
+2. A primary Mermaid system diagram immediately after the title, before prose.
+3. Motivation.
+4. Proposed behavior, developed from lifecycle and critical control flow into detailed mechanics.
+5. Implementation plan with ordered steps and stable constraint IDs.
+6. Safety and liveness invariants.
+7. Implementation map with concrete files, symbols, ownership, and dependency changes.
+8. Complete system view: the most granular diagram, after the reader has the vocabulary needed to interpret it.
+9. Test coverage, after the complete system view.
 
-- **Unit and regression tests:** use Rust `#[test]`, private `#[cfg(test)] mod tests` where appropriate, and integration tests under `tests/`. Use the runtime's test attribute for async tests. Assert success, boundary inputs and failure behavior; retain a regression for repaired defects.
-- **Property-based tests:** use `proptest!` or an equivalent justified framework for generated inputs and operation sequences. Define generators, preconditions, independent oracle, shrinking strategy and replayable failures. Specify the actual universal property. A handful of randomized samples is not a substitute for these requirements.
-- **Stateful and fault tests:** exercise ordering, duplication, partitions, cancellation, restart, persistence failures and resource bounds when relevant. State the fault model, forbidden traces and liveness assumptions. Preserve seeds/traces and minimize failing histories.
-- **Antithesis:** research concrete safety, liveness and reachability assertions; propose SDK instrumentation, workload, topology, setup and a runnable local smoke check where applicable. Distinguish proposed hooks from installed hooks, and local execution from a hosted campaign. Include the required integration and execution scope in the plan before greenlight; use current `antithesis-documentation` guidance for integration. A hosted run requires configured access and authorization and cannot be inferred from a research pass. If agreed hosted validation is unavailable, report that specific review blocker.
+Do not add a standalone “how the system works today” or repository-tour section. Existing behavior belongs only where it explains a design seam, a compatibility requirement, or an invariant that the change must preserve. Do not repeat the prompt, meeting notes, process history, owners, schedules, experiments, or next steps.
 
-Tests must be independent enough to detect a wrong implementation; do not copy its decision logic into the oracle. Planned cases are not passing results. The fresh test agent owns test implementation, including property tests and agreed Antithesis hooks/workloads.
+Keep the document concise without deleting code-level detail that changes correctness. Prefer dense, exact descriptions over summaries that force the reader to rediscover constraints in the source.
 
-## Constraint-first Mermaid
+## Reader-anticipation sequencing
 
-Section 2 starts with exactly one **primary system snapshot**. Use a Mermaid diagram with UML-style boundaries and relationships. Prefer a left-to-right component view unless the system is fundamentally a lifecycle or data model. The snapshot must show, where relevant:
+<strong><span style="text-decoration-line: underline; text-decoration-style: double;">Good technical writing models the reader's own next thought and resolves it before they have to ask. Use that thought to order the material, then hide the scaffolding behind ordinary engineering headings that a human would naturally expect in a design document.</span></strong>
 
-- human actors and external systems outside the system boundary;
-- components inside the boundary, grouped by ownership, trust or deployment boundary;
-- the authoritative owner of mutable state and each durable store;
-- permitted calls, events or data movement, with arrow meaning stated once;
-- the critical success path and any failure or recovery path that changes externally visible behavior;
-- constraint and invariant IDs at the box, boundary or arrow they constrain.
+The heading list is the technical spine of the artifact. A reader who scans only the headings should understand the system's reasoning path, the engineering content of every section, and why each section follows the previous one.
 
-The snapshot is a map, not a prose container. Use one reading direction, short role-based labels and no implementation fields or method inventories. Do not encode a binding rule only in a node label or Mermaid comment. Keep predicates, units, cardinalities, time bounds, authorization rules, retry budgets, ordering guarantees and recovery assumptions in sections 3 and 4; the diagram points to those rows by ID.
+- Make every title maximally informative per word. Titles are labels, not prose: remove ornamental adjectives, scene-setting, and performative phrasing. Prefer “Handoff Sequence,” “Leader Change Submission,” “Block Production Handover,” “Success Criteria,” and “E2E Failover Tests” over “Graceful Handoff Design,” literal questions, vague labels such as “Lifecycle,” or rubric-shaped phrases such as “Real-Process Handoff Coverage.”
+- Use `E2E`, not “end-to-end.” Match the compact vocabulary engineers use with each other.
+- Do not force every constraint into the heading. Use the heading to orient the reader, then state immutability, evidence, deadlines, and other precise rules in the first paragraph or a focused subheading.
+- Reuse the nouns and concepts established immediately above so the reader never has to translate between two vocabularies.
+- Introduce a mechanism only after explaining the problem that makes it necessary. Introduce edge cases immediately after the normal path raises them.
+- Put bounds, failure behavior, and recovery directly after the operation whose failure the reader will now be wondering about.
+- Do not combine unrelated concepts in an `X and Y` heading merely because they share code. Split them or name the single engineering concept that connects them.
+- Reorder the material when the natural question sequence differs from the repository layout or implementation order.
 
-Add at most one supporting diagram when a critical behavior cannot be understood from the snapshot and tables alone. Use a sequence diagram for ordering and concurrency, a state diagram for lifecycle and recovery, or an ER/class diagram for cardinality and ownership. A supporting diagram answers one named review question. Label state transitions `event [guard] / effect`. Do not add a diagram merely to restate the primary view.
+Before presenting the plan, read only its title and headings in order. Rewrite any heading that sounds like a grading rubric, generated taxonomy, or compressed summary rather than something an experienced engineer would naturally say. Artifact headings should not be written as questions.
 
-Apply these consistency rules:
+## Diagram progression
 
-- Every ID shown in Mermaid exists exactly once in the constraint or invariant tables.
-- Every architecturally consequential boundary or arrow has an applicable ID.
-- Every `proposed` or `unresolved` row is visible in the review focus and easy to locate in the diagram when it affects structure or flow.
-- Diagram and table conflicts are contract defects; resolve them before greenlight.
-- Arrows have one declared meaning per diagram. Bidirectional arrows require independently defined behavior in both directions.
-- Safety invariants say what must never happen. Liveness invariants state the progress assumptions and time or retry boundary under which progress is required.
+All diagrams are engineering drawings written in plain English. A box should say what a component or state does, owns, or guarantees. Put code symbols and file paths in the implementation map, not in the opening diagram.
 
-Before presenting the first artifact, inspect it as a skeptical engineer: confirm that the system boundary, state ownership, allowed and forbidden interactions, critical limits, failure behavior and unresolved choices are visible without reconstructing them from prose. Confirm that every test has an observable oracle and that every consequential constraint has planned coverage. This check improves the draft; it does not replace user correction or establish that the proposed design is right.
+### Primary diagram
 
-Render and inspect the changed diagrams locally or in the authorized repository browser when available. Check syntax, reading order, label clipping and legibility at normal browser width. If the snapshot needs extensive narration to decode, simplify it. Temporary validation files stay outside the repository. Do not introduce diagram sidecars; report any rendering check you could not perform.
+The first diagram is a real system view, not a decorative overview and not a prose-heavy decision tree. It should be slightly quieter than the complete system view while showing enough detail to stand on its own:
 
-## Rust implementation standard
+- external trigger or actor;
+- system and process boundaries;
+- the components on the critical success path;
+- authoritative and durable state owners;
+- permitted control and data flow;
+- the externally meaningful recovery path;
+- exact limits, ordering rules, and guards when they define safe behavior.
 
-For Rust tasks, use the guidance below when filling the plan and implementing it. It adapts [Apollo's rust-best-practices skill](https://github.com/apollographql/skills/blob/main/skills/rust-best-practices/SKILL.md), with the official [Rust Style Guide](https://doc.rust-lang.org/style-guide/), [API Guidelines](https://rust-lang.github.io/api-guidelines/), and [Cargo layout](https://doc.rust-lang.org/cargo/guide/project-layout.html) as references. These are conventions plus engineering judgment, not a universal architecture. For new Rust projects use the latest stable edition and a current stable toolchain, verified at planning time. Rust currently names its latest stable edition **2024**, not 2026; editions and compiler releases are different. Never default a new project to 2021 without a concrete compatibility reason. For existing repositories, identify compatibility constraints and include any edition/toolchain migration in the approved scope.
+Use one reading direction and short English labels. Keep related components inside named subgraphs. Label arrows with the event, data, or permission they carry. State numeric bounds and ownership directly instead of hiding them behind unexplained IDs.
 
-- **Architecture and files (section 2):** identify modules, their responsibilities, dependency direction, state owners and I/O boundaries. Use standard Cargo layout: `src/lib.rs` for reusable logic, `src/main.rs` for executable wiring, cohesive domain modules when needed, integration tests under `tests/`, private unit tests beside their code. Keep the smallest layout that makes those boundaries clear; do not create a file per type or layers named manager/service/factory without a concrete need. Existing layouts need no cosmetic reorganization.
-- **Types and ownership (sections 2–3):** keep internals private and expose the smallest useful API. Prefer enums/newtypes when they prevent invalid states or mixed identifiers. Use concrete types first; introduce traits for actual substitution, including fault injection. Borrow when ownership is unnecessary; explain substantial cloning or shared mutation. For async systems, define task ownership, cancellation, shutdown, bounded queues and lock scope. Avoid blocking runtime workers and holding locks across network waits.
-- **Errors and safety (sections 3–4):** specify which errors callers must distinguish and how they map to API outcomes. Use `Result` and preserve causes; typed errors fit library boundaries, contextual reporting fits applications. Do not require an error crate without need. External input, disk and network failures must not rely on `unwrap`/`expect`. Any deliberate invariant panic needs justification. Prefer safe Rust; any necessary unsafe block needs its safety obligations documented and checked.
-- **Reviewability (sections 5–6):** document public behavior, errors and important invariants with rustdoc; comments explain non-obvious reasons. Tests cover behavior and failure modes, with enough assertions to establish the property. Prefer direct code over premature generic frameworks; optimize after measurement.
-- **Tooling (section 6):** record the repository's edition, toolchain/MSRV policy, supported feature combinations and exact validation commands. Use stable rustfmt defaults unless the repository config says otherwise. Fix Clippy findings; narrowly justified lint exceptions only, using `#[expect]` when supported. Use formatting for the selected edition; do not enable every pedantic/nursery lint or add dependencies merely to satisfy an external style preference.
+### Supporting diagrams
 
-Default checks for a Cargo workspace with a committed lockfile:
+Add lifecycle, sequence, or focused flow diagrams only when they reveal ordering, concurrency, or failure behavior that the primary diagram cannot show cleanly. Each diagram must add detail. Do not restate the same flow at a different level or substitute a flowchart for precise contract text.
 
-```sh
-cargo fmt --all -- --check
-cargo check --workspace --all-targets --locked
-cargo test --workspace --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
-```
+### Complete system view
 
-Adapt commands to the actual project. Check supported non-default feature combinations explicitly; `--all-features` does **not** resolve mutually exclusive features. Include doctests where applicable. A new project generates its lockfile before locked checks. Completion includes a human-comprehension review of the module boundaries and public API, not just green lints. Record unrun checks honestly. All these decisions remain inside the same six-section PLAN.md.
+End the design material with the most granular architecture diagram. It may include concrete internal components, durable stores, concurrency and shutdown ownership, control and data planes, observability, protocol boundaries, and constraint or invariant IDs. It must remain readable at normal browser width; split genuinely independent flows into earlier supporting diagrams rather than making this final view a wall of text.
 
-## Required form
+## Required content
 
-````markdown
-# <Work title>
+### Motivation
 
-## 1. Outcome and scope
-<What the system/change must do. In scope, excluded scope, and meaningful assumptions. No copied prompt or conversation history.>
+Use one short paragraph. State the operational or product failure, why the existing system cannot provide the desired outcome, what success changes, and the hard boundary. Do not preview mechanics that the following sections explain. Describe triggers by behavior—such as recoverable process exit or supervised panic—rather than treating one deployment mechanism such as Kubernetes SIGTERM as the entire problem.
 
-Review focus: <List proposed or unresolved choices that need engineer attention, or `none`.>
+### Proposed behavior
 
-## 2. Design
-<State what arrows mean. Then give the primary system snapshot: boundary, actors, components, ownership, permitted dependencies, authoritative state, data flow, persistence, concurrency and contract-changing failure/recovery paths. Put applicable constraint and invariant IDs on boxes, boundaries or arrows.>
+Describe the new control flow in execution order. Include, where relevant:
 
-```mermaid
-<primary system snapshot>
-```
+- entry conditions and every trigger class;
+- state ownership and exactly-once behavior;
+- authority and authorization checks;
+- deterministic selection and retry boundaries;
+- the exact point after which a choice becomes immutable;
+- ordering between durable state changes, receipts, finality, and local effects;
+- what continues running during coordination;
+- success evidence and how it is observed;
+- deadlines, clock semantics, cancellation, shutdown, and supervisor interaction;
+- failure outcomes and the recovery path for failures that cannot run in-process;
+- compatibility, rollout, security, and unchanged protocol behavior.
 
-<Add no more than one focused supporting diagram only when required.>
+Never turn unresolved engineering questions from the prompt into a copied question list. Answer them from source evidence and invariants, or identify the single decision that genuinely requires user input.
 
-## 3. Interfaces and constraints
-Status is `confirmed`, `proposed` or `unresolved`. State the basis for every confirmed row. Each row contains one checkable rule.
+### Implementation plan
 
-| ID | Boundary | Required behavior | Status and basis |
-| --- | --- | --- | --- |
-| C1 | <API / trust / ownership / dependency boundary> | <Inputs, outputs, limits, authorization, errors, retries, ordering and compatibility as relevant> | <status; source of confirmation when confirmed> |
+Use the heading `Implementation Plan`. Present the implementation as ordered, action-oriented steps and give each consequential step a stable constraint ID (`C1`, `C2`, …). Each statement must be independently checkable.
 
-## 4. Invariants
-| ID | Property | Scope and assumptions | Status and basis |
-| --- | --- | --- | --- |
-| I1 | <Precisely what must never happen, or must eventually happen> | <Scope, failure model, progress assumptions and bound> | <status; source of confirmation when confirmed> |
+- An implementation step names the concrete change and defines its input, boundary, owner, order, limit, failure response, or compatibility rule.
 
-## 5. Test cases
-Antithesis research: <pending until implementation / completed; scope and material limits>.
-<Before greenlight: proposed tests and agreed Antithesis integration/execution scope. After implementation: research refines these cases against actual source without weakening the approved contract.>
+### Invariants
 
-| ID | Covers | Setup and action / fault schedule | Expected result | Test method |
-| --- | --- | --- | --- | --- |
-| T1 | C1, I1 | <Concrete scenario> | <Observable pass/fail outcome> | <Unit / simulation / process / integration / hosted> |
+Give invariants stable IDs (`I1`, `I2`, …). Each invariant must be independently checkable.
 
-<Test seams and independent oracle needed to implement these cases. Define liveness recovery conditions and timeout semantics. Proposed tests are not passing results.>
+- A safety invariant says what must never happen and under which failure model.
+- A liveness invariant states the assumptions and numeric bound under which progress is required.
 
-## 6. Implementation handoff
-Status: <awaiting user greenlight / approved / implementing / testing / ready for review / blocked>.
-Approval: <pending / user-approved scope and any subsequent agreed changes>.
+Do not use status columns such as confirmed, proposed, or unresolved. The document is the plan being presented for human review. Do not encode a binding rule only in Mermaid.
 
-<Short implementation sequence, required test hooks, commands/checks, and completion criteria. Include references needed to implement the contract. Brief verification status may be added after work; no separate report.>
-````
+### Implementation map
 
-Use an outer fence longer than the embedded Mermaid fence when presenting the entire form as a code block. The form above describes the structure; do not leave angle-bracket placeholders in an actual plan. If a category is irrelevant, write one short reason under its heading instead of manufacturing requirements.
+Map behavior to the actual repository. Name the files, existing symbols, new responsibilities, and dependency direction. Explain why each seam changes and what remains untouched. Include required configuration and deployment changes. Avoid exhaustive file lists, speculative abstractions, and declarations with no control-flow consequence.
 
-Mermaid and English define the intended behavior; they do not prove the implementation correct. Tests should check observable outcomes, including forbidden traces, rather than duplicate implementation logic. Distinguish local tests, simulated faults and hosted Antithesis runs in the brief verification status.
+## Test coverage
+
+Place all test material after the complete system view under one `Test coverage` section. Describe tests to write, not tests claimed to pass.
+
+Start with concrete test groups; do not add a preamble that explains how to read the tests. Do not create a standalone test-hooks or observability section. Put a required test-only hook or failpoint inside the specific test that needs it, and keep it unavailable through production-facing interfaces.
+
+For each applicable test, state:
+
+- the constraints and invariants covered;
+- setup and exact action or fault schedule;
+- the external or independent oracle;
+- the literal pass condition;
+- timeout and healing assumptions;
+- how a failure is reproduced with a seed or minimized trace when relevant.
+
+Use standard testing categories: unit/model tests, E2E tests, chaos tests, and regression tests. Chaos coverage should include ordering, duplication, partitions, pauses, process exits, restarts, persistence or provider ambiguity, and bounded-resource behavior when applicable. Separate safety properties, which hold continuously, from recovery checks, which require stated healing and scheduling assumptions.
+
+Translate fault research into a short `Chaos Tests` section written in ordinary system language. Explain in one sentence why these cases are not covered by unit tests or a normal E2E run, then use a `Scenario | Failure introduced | Expected result` table. Do not invent a testing category, expose assertion-framework taxonomy, use SDK terms or code-style property names, describe a branded campaign, or add a tool-specific topology, hosted-run plan, or product-documentation discussion. The runner is an implementation choice, not part of the design. Do not copy implementation decision logic into the test oracle.
+
+End the artifact with one small `Metrics` table after all test sections. Include only the metric name, type, bounded labels, and operational purpose. Do not precede it with observability prose, and never use secrets, endpoints, hashes, identities, transaction bodies, or raw errors as metric labels.
+
+## Final checks
+
+Before presenting the artifact, verify:
+
+- the opening diagram is first, uses English boxes, exposes real boundaries and limits, and is less detailed than the complete view without becoming vague;
+- the diagrams become progressively more detailed and do not repeat one another;
+- the declarative headings alone form a clear technical progression, with each section resolving the uncertainty created by the preceding material;
+- the motivation explains why the change matters;
+- every failure path ends in an explicit outcome;
+- constraints, invariants, implementation seams, and tests agree;
+- every consequential contract rule has observable test coverage;
+- the complete system view appears before test coverage;
+- tests begin with concrete cases and end with one small metrics table;
+- no current-system survey, review focus, approval state, experiment material, duplicate artifact, or Antithesis campaign section remains;
+- claims about code and existing tests are supported by inspection, and planned checks are not presented as completed.
+
+Present the finished artifact with a direct link. If the user asks to view it in a browser, open that same `spt_*.md` file; do not generate an HTML or second Markdown copy.
