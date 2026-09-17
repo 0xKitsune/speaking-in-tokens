@@ -1,3 +1,5 @@
+![Speaking in Tokens — constraint-first engineering plans](assets/speaking-in-tokens-cover.png)
+
 # Speaking in Tokens
 
 Speaking in Tokens turns an engineering request and its codebase into one reviewable `spt_<task>.md` artifact with a descriptive task name.
